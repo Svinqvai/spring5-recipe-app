@@ -1,11 +1,17 @@
 package guru.springframework.controllers;
 
 import guru.springframework.commands.RecipeCommand;
+import guru.springframework.exceptions.NotFoundException;
 import guru.springframework.services.RecipeService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
+
+import javax.validation.Valid;
 
 /**
  * Created by jt on 6/19/17.
@@ -14,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @Controller
 public class RecipeController {
 
+    public static final String RECIPE_RECIPEFORM = "recipe/recipeform";
     private final RecipeService recipeService;
 
     public RecipeController(RecipeService recipeService) {
@@ -32,19 +39,22 @@ public class RecipeController {
     @RequestMapping("recipe/new")
     public String newRecipe(Model model){
         model.addAttribute("recipe", new RecipeCommand());
-
-        return "recipe/recipeform";
+        return RECIPE_RECIPEFORM;
     }
 
     @GetMapping
     @RequestMapping("recipe/{id}/update")
     public String updateRecipe(@PathVariable String id, Model model){
         model.addAttribute("recipe", recipeService.findCommandById(Long.valueOf(id)));
-        return  "recipe/recipeform";
+        return RECIPE_RECIPEFORM;
     }
 
     @PostMapping("recipe")
-    public String saveOrUpdate(@ModelAttribute RecipeCommand command){
+    public String saveOrUpdate(@Valid @ModelAttribute("recipe") RecipeCommand command, BindingResult bindingResult){
+        if(bindingResult.hasErrors()){
+            bindingResult.getAllErrors().forEach(e -> log.error(e.toString()));
+            return RECIPE_RECIPEFORM;
+        }
         RecipeCommand savedCommand = recipeService.saveRecipeCommand(command);
 
         return "redirect:/recipe/" + savedCommand.getId() + "/show";
@@ -58,5 +68,13 @@ public class RecipeController {
 
         recipeService.deleteById(Long.valueOf(id));
         return "redirect:/";
+    }
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ExceptionHandler(NotFoundException.class)
+    public ModelAndView handleNotFound(Exception e){
+        log.error("Page not found");
+        ModelAndView modelAndView = new ModelAndView("404error");
+        modelAndView.addObject("exception",e);
+        return modelAndView;
     }
 }
